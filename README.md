@@ -1,4 +1,4 @@
-# KukeExpPond - 多池经验温泉与奖励插件
+# KukeExpPond - 新一代的现代化 经验挂机池 插件
 
 [English README](./README.en.md)
 
