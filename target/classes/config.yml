@@ -1,0 +1,132 @@
+############################################
+# KukeExpPond 配置文件 (1.8–1.21 兼容)
+# 所有配置均可热重载。
+#
+# 变量占位：
+#  - {player}: 玩家名
+#  - {pond}: 池名称
+#  - {money_today}/{money_max}: 今日/每日上限的金币
+#  - {points_today}/{points_max}: 今日/每日上限的点券
+#  - 其他 UI 项按实现映射
+#
+# 使用说明：
+# - 该文件为默认配置示例，插件启动时会自动补全缺失项。
+# - 修改后可执行 `/kep reload` 热重载；也可用 `/kep updateconfig` 自动补全缺失项。
+# - 文本支持彩色代码（&a/&b 等），按服务端显示规则渲染。
+############################################
+
+# 配置文件版本（请勿修改）
+config_version: "1.0.0"
+
+general:
+  # 全局消息前缀
+  prefix: "&7[&bKukeExpPond&7] "
+  # 数据存储方式：yaml 或 sqlite（首版推荐 yaml）
+  storage: yaml
+  debug: false      # 调试日志：奖励计算、占位符取值、事件拦截
+  # 全局每日重置时间（HH:mm），池级可覆盖；默认凌晨 00:00
+  daily_reset_time: "00:00"
+  # 全局时区（例如 Asia/Shanghai），池级可覆盖
+  timezone: "Asia/Shanghai"
+  # 防结冰系统配置
+  ice_prevention:
+    enable: true                      # 是否启用防结冰系统
+    check_interval: 30                # 检查间隔（秒）
+    convert_ice_to_water: true        # 是否将冰块转换为水
+    debug_log: false                  # 是否记录防结冰调试日志
+  version_mapping:
+    # 粒子/音效的跨版本回退策略，仅示例（找不到枚举时使用这些回退）
+    particle_fallback: CLOUD
+    join_sound_fallback: ENTITY_EXPERIENCE_ORB_PICKUP
+    leave_sound_fallback: BLOCK_WATER_AMBIENT
+
+# 多池配置：键为池名
+ponds:
+  default:
+    world: world
+    region:
+      # 选区两个点，支持跨版本；未设置时命令无法创建/启用
+      pos1: { x: 0, y: 64, z: 0 }
+      pos2: { x: 10, y: 70, z: 10 }
+    permission:
+      pond_permission: pond.default     # 进入权限节点（动态，按池自定义）
+      pond_join: true                   # 无权限是否允许进入（true/false）
+      bypass_permission: kukeexppond.bypass  # 可跳过限制（如传送阻止）
+    mode:
+      xp_mode: bottle                   # bottle 或 direct
+    bottle:
+      enable: true
+      bottle_speed: 5                   # 每轮生成间隔（秒）
+      bottle_count: 3                   # 每轮生成个数
+      only_above_water: true            # 仅在水方块上方生成
+      drop_height: 4.0                  # 瓶子生成相对高度（米），从玩家附近位置往上抬高后投掷
+    reward:
+      exp:
+        enable: true
+        speed: 10                      # 直接模式下每周期给予经验
+        count: 5                       # 每周期经验点数
+      money:
+        enable: true
+        speed: 10                       # 发放周期（秒）
+        count: 5                        # 每周期金额
+        max: 500                        # 每日上限
+      points:
+        enable: false
+        speed: 15
+        count: 2
+        max: 200
+      command:
+        enable: false
+        speed: 30
+        commands:
+          - "say Congrats {player}"
+      async: true                         # 强制异步发放（必要）
+      daily_reset_time: "04:00"          # 每日重置时间（HH:mm）
+      timezone: "Asia/Shanghai"          # 时区
+    ui:
+      title:
+        join_title: "&b欢迎来到经验温泉"
+        join_subTitle: "&7放松身心，享受奖励"
+        leave_title: "&7你离开了经验温泉"
+        leave_subTitle: ""
+        error_title: "&c无法进入"
+        error_subTitle: "&7你没有权限"
+        fadeIn: 10
+        stay: 40
+        fadeOut: 10
+      actionbar:
+        enable: true
+        template: "&b{pond}&7: 金币 {money_today}/{money_max} | 点券 {points_today}/{points_max}"
+      bossbar:
+        enable: true
+        color: BLUE
+        style: SEGMENTED_10
+        items: [MONEY_PROGRESS, POINTS_PROGRESS, ONLINE_IN_POND, NEXT_REWARD_COUNTDOWN]
+      message:
+        money: "&a获得金币 {amount} (今日 {money_today}/{money_max})"
+        points: "&a获得点券 {amount} (今日 {points_today}/{points_max})"
+        teleport: "&e请不要使用传送功能进入挂机池"
+    sound:
+      join_sound_id: ENTITY_PLAYER_LEVELUP
+      join_sound_volume: 1.0
+      join_sound_pitch: 1.2
+      leave_sound_id: BLOCK_WATER_AMBIENT
+      leave_sound_volume: 0.8
+      leave_sound_pitch: 1.0
+    effects:
+      steam_hot_spring:           #  蒸汽特效
+        enable: true
+        rate: 10
+        particle: CLOUD
+      water_bubble:               #  气泡特效
+        enable: true
+        rate: 10
+        particle: BUBBLE_COLUMN_UP
+      smoke_bottom:               #  烟雾特效
+        enable: true
+        rate: 20
+        particle: CAMPFIRE_COSY_SMOKE
+      density: 1.0
+    teleport:
+      block_enter_by_teleport: true
+      message: "&e请不要使用传送功能进入挂机池"

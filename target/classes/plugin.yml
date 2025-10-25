@@ -1,0 +1,16 @@
+name: KukeExpPond
+version: 1.0-SNAPSHOT
+main: kuke.kukeExpPond.KukeExpPond
+api-version: 1.13
+authors: [Kuke]
+description: Multi-pond XP hot spring plugin with cross-version support (1.8–1.21)
+softdepend: [Vault, PlayerPoints, PlaceholderAPI]
+commands:
+  kukeexppond:
+    description: KukeExpPond root command
+    aliases: [kep]
+    usage: "/kep help"
+permissions:
+  kukeexppond.admin:
+    description: Admin permission for KukeExpPond management commands
+    default: op
