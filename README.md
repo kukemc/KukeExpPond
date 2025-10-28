@@ -206,7 +206,8 @@ ponds:
 
 
 ## 插件截图
-![screenshot](https://github.com/user-attachments/assets/83408843-b970-4474-8637-5865eaba800d)
+<img width="886" height="315" alt="PixPin_2025-10-29_02-43-15" src="https://github.com/user-attachments/assets/89988da0-f071-4f3c-916f-bcc00e228d01" />
+
 
 ## 反馈
 - QQ 讨论群：`981954623`
