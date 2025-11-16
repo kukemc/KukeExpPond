@@ -26,6 +26,14 @@ public class RewardManager {
     private final Map<String, BukkitTask> commandTasks = new HashMap<>();
     private BukkitTask dailyResetTask;
 
+    // 供 UI 实时倒计时使用：每个鱼塘、每种奖励的下次触发时间（秒级 epoch）
+    private final Map<String, Integer> moneySpeedSec = new HashMap<>();
+    private final Map<String, Integer> pointsSpeedSec = new HashMap<>();
+    private final Map<String, Integer> commandSpeedSec = new HashMap<>();
+    private final Map<String, Long> moneyNextEpochSec = new HashMap<>();
+    private final Map<String, Long> pointsNextEpochSec = new HashMap<>();
+    private final Map<String, Long> commandNextEpochSec = new HashMap<>();
+
     public RewardManager(KukeExpPond plugin, PondManager pondManager, HookManager hookManager, DataStore dataStore) {
         this.plugin = plugin;
         this.pondManager = pondManager;
@@ -53,6 +61,12 @@ public class RewardManager {
         moneyTasks.clear();
         pointsTasks.clear();
         commandTasks.clear();
+        moneySpeedSec.clear();
+        pointsSpeedSec.clear();
+        commandSpeedSec.clear();
+        moneyNextEpochSec.clear();
+        pointsNextEpochSec.clear();
+        commandNextEpochSec.clear();
         if (dailyResetTask != null) {
             dailyResetTask.cancel();
             dailyResetTask = null;
@@ -71,6 +85,8 @@ public class RewardManager {
         int moneyMax = plugin.getConfig().getInt("ponds." + name + ".reward.money.max", 0);
         boolean moneyEnable = plugin.getConfig().getBoolean("ponds." + name + ".reward.money.enable", false);
         if (moneyEnable && hookManager.isVaultPresent() && moneySpeed > 0 && moneyCount > 0) {
+            moneySpeedSec.put(name, moneySpeed);
+            moneyNextEpochSec.put(name, System.currentTimeMillis() / 1000L + moneySpeed);
             BukkitTask t = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
                 for (Player p : listPlayersInPond(pond)) {
                     if (!isEligibleForReward(p, pond)) continue;
@@ -79,11 +95,20 @@ public class RewardManager {
                     if (moneyMax > 0 && daily + moneyCount > moneyMax) continue;
                     // economy operations on main thread for safety
                     Bukkit.getScheduler().runTask(plugin, () -> {
-                        hookManager.depositMoney(id, moneyCount);
-                        dataStore.addMoney(id, name, moneyCount);
-                        chat.send(p, "&a获得金钱: &e" + moneyCount);
+                        boolean ok = hookManager.depositMoney(p, moneyCount);
+                        if (ok) {
+                            dataStore.addMoney(id, name, moneyCount);
+                            chat.send(p, "&a获得金钱: &e" + moneyCount);
+                        } else {
+                            // 调试时给出提示日志，避免误导玩家
+                            if (plugin.getConfig().getBoolean("general.debug", false)) {
+                                plugin.getLogger().warning("发放金钱失败: player=" + p.getName() + ", amount=" + moneyCount + ". 请检查 Vault 与经济插件是否正确安装并启用。");
+                            }
+                        }
                     });
                 }
+                // 更新下次触发时间（即当前执行完成后再延时 moneySpeed 秒）
+                moneyNextEpochSec.put(name, System.currentTimeMillis() / 1000L + moneySpeed);
             }, 20L * moneySpeed, 20L * moneySpeed);
             moneyTasks.put(name, t);
         }
@@ -94,6 +119,8 @@ public class RewardManager {
         int pointsMax = plugin.getConfig().getInt("ponds." + name + ".reward.points.max", 0);
         boolean pointsEnable = plugin.getConfig().getBoolean("ponds." + name + ".reward.points.enable", false);
         if (pointsEnable && hookManager.isPlayerPointsPresent() && pointsSpeed > 0 && pointsCount > 0) {
+            pointsSpeedSec.put(name, pointsSpeed);
+            pointsNextEpochSec.put(name, System.currentTimeMillis() / 1000L + pointsSpeed);
             BukkitTask t = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
                 for (Player p : listPlayersInPond(pond)) {
                     if (!isEligibleForReward(p, pond)) continue;
@@ -106,6 +133,8 @@ public class RewardManager {
                         chat.send(p, "&a获得点券: &e" + pointsCount);
                     });
                 }
+                // 更新下次触发时间
+                pointsNextEpochSec.put(name, System.currentTimeMillis() / 1000L + pointsSpeed);
             }, 20L * pointsSpeed, 20L * pointsSpeed);
             pointsTasks.put(name, t);
         }
@@ -115,6 +144,8 @@ public class RewardManager {
         int cmdSpeed = plugin.getConfig().getInt("ponds." + name + ".reward.command.speed", 0);
         List<String> cmds = plugin.getConfig().getStringList("ponds." + name + ".reward.command.commands");
         if (cmdEnable && cmdSpeed > 0 && cmds != null && !cmds.isEmpty()) {
+            commandSpeedSec.put(name, cmdSpeed);
+            commandNextEpochSec.put(name, System.currentTimeMillis() / 1000L + cmdSpeed);
             BukkitTask t = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
                 for (Player p : listPlayersInPond(pond)) {
                     if (!isEligibleForReward(p, pond)) continue;
@@ -125,6 +156,8 @@ public class RewardManager {
                         }
                     });
                 }
+                // 更新下次触发时间
+                commandNextEpochSec.put(name, System.currentTimeMillis() / 1000L + cmdSpeed);
             }, 20L * cmdSpeed, 20L * cmdSpeed);
             commandTasks.put(name, t);
         }
@@ -141,6 +174,32 @@ public class RewardManager {
             return false; // inside but no rewards
         }
         return true;
+    }
+
+    /**
+     * 供 UI 使用：返回该鱼塘下次奖励剩余秒数（综合 money/points/command 的最小值）。
+     * 若都未启用或不可用，返回 0。
+     */
+    public int getNextRemainingSeconds(String pondName) {
+        long now = System.currentTimeMillis() / 1000L;
+        int best = Integer.MAX_VALUE;
+        Long m = moneyNextEpochSec.get(pondName);
+        if (m != null) {
+            int remain = (int) Math.max(0L, m - now);
+            if (remain > 0) best = Math.min(best, remain);
+        }
+        Long p = pointsNextEpochSec.get(pondName);
+        if (p != null) {
+            int remain = (int) Math.max(0L, p - now);
+            if (remain > 0) best = Math.min(best, remain);
+        }
+        Long c = commandNextEpochSec.get(pondName);
+        if (c != null) {
+            int remain = (int) Math.max(0L, c - now);
+            if (remain > 0) best = Math.min(best, remain);
+        }
+        if (best == Integer.MAX_VALUE) return 0;
+        return best;
     }
 
     private List<Player> listPlayersInPond(Pond pond) {

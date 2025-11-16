@@ -86,6 +86,59 @@ public class ConfigManager {
     }
 
     /**
+     * 为新建池应用默认模板（拷贝 resources/config.yml 中 ponds.default 的全部键到 ponds.{pondName}）
+     * 不覆盖已存在的键；适用于 create 命令生成完整配置骨架。
+     * @param pondName 规范化后的池名
+     * @return 是否成功写入模板
+     */
+    public boolean applyDefaultPondTemplate(String pondName) {
+        if (pondName == null || pondName.trim().isEmpty()) return false;
+        try {
+            java.io.InputStream in = plugin.getResource("config.yml");
+            if (in == null) {
+                plugin.getLogger().warning("无法读取默认配置模板 resources/config.yml");
+                return false;
+            }
+            org.bukkit.configuration.file.FileConfiguration def = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.InputStreamReader(in, "UTF-8"));
+            org.bukkit.configuration.ConfigurationSection src = def.getConfigurationSection("ponds.default");
+            if (src == null) {
+                plugin.getLogger().warning("默认模板缺少 ponds.default 节");
+                return false;
+            }
+            org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
+            String destPath = "ponds." + pondName;
+            org.bukkit.configuration.ConfigurationSection dest = cfg.getConfigurationSection(destPath);
+            if (dest == null) {
+                dest = cfg.createSection(destPath);
+            }
+            // 递归复制键（仅在不存在时写入，避免覆盖 create 已写值）
+            copySection(src, dest, false);
+            plugin.saveConfig();
+            return true;
+        } catch (Exception e) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING, "应用默认池模板失败: " + e.getMessage(), e);
+            return false;
+        }
+    }
+
+    private void copySection(org.bukkit.configuration.ConfigurationSection src, org.bukkit.configuration.ConfigurationSection dest, boolean overwrite) {
+        for (String key : src.getKeys(false)) {
+            if (src.isConfigurationSection(key)) {
+                org.bukkit.configuration.ConfigurationSection srcChild = src.getConfigurationSection(key);
+                org.bukkit.configuration.ConfigurationSection destChild = dest.getConfigurationSection(key);
+                if (destChild == null) destChild = dest.createSection(key);
+                copySection(srcChild, destChild, overwrite);
+            } else {
+                String path = key;
+                if (overwrite || !dest.contains(path)) {
+                    Object val = src.get(path);
+                    dest.set(path, val);
+                }
+            }
+        }
+    }
+
+    /**
      * Get a flat snapshot map of pond overview data for listing commands.
      */
     public Map<String, String> getPondOverview() {

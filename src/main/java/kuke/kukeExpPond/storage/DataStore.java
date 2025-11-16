@@ -58,6 +58,14 @@ public class DataStore {
         return data.getInt(pondPath(uuid, pond) + ".points_day", 0);
     }
 
+    public void resetDailyMoney(UUID uuid, String pond) {
+        data.set(pondPath(uuid, pond) + ".money_day", 0);
+    }
+
+    public void resetDailyPoints(UUID uuid, String pond) {
+        data.set(pondPath(uuid, pond) + ".points_day", 0);
+    }
+
     public void addMoney(UUID uuid, String pond, int amount) {
         int day = getDailyMoney(uuid, pond) + amount;
         data.set(pondPath(uuid, pond) + ".money_day", day);

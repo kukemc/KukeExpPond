@@ -5,6 +5,8 @@ import kuke.kukeExpPond.config.ConfigManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,10 +31,12 @@ public class KepTab implements TabCompleter {
             subs.add("list");
             subs.add("info");
             subs.add("reload");
+            subs.add("updateponds");
             subs.add("updateconfig");
             subs.add("checkconfig");
             subs.add("validateconfig");
             subs.add("importnext");
+            subs.add("resetday");
             return filter(subs, args[0]);
         }
         if (args.length == 2) {
@@ -45,6 +49,30 @@ public class KepTab implements TabCompleter {
                 List<String> opts = new ArrayList<String>();
                 opts.add("override");
                 return filter(opts, args[1]);
+            }
+            if ("resetday".equals(sub)) {
+                List<String> names = new ArrayList<String>();
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    names.add(p.getName());
+                }
+                return filter(names, args[1]);
+            }
+        }
+        if (args.length == 3) {
+            String sub = args[0].toLowerCase();
+            if ("resetday".equals(sub)) {
+                Set<String> names = cfg.getPondNames();
+                return filter(new ArrayList<String>(names), args[2]);
+            }
+        }
+        if (args.length == 4) {
+            String sub = args[0].toLowerCase();
+            if ("resetday".equals(sub)) {
+                List<String> opts = new ArrayList<String>();
+                opts.add("money");
+                opts.add("points");
+                opts.add("both");
+                return filter(opts, args[3]);
             }
         }
         return Collections.emptyList();

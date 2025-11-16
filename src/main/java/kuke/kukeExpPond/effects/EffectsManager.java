@@ -78,13 +78,14 @@ public class EffectsManager {
             }, 20L, Math.max(1L, rate)));
         }
 
-        // smoke_bottom - 从水底生成并向上飘散
+        // smoke_bottom - 从水面/方块顶部生成并向上飘散
         if (plugin.getConfig().getBoolean("ponds." + name + ".effects.smoke_bottom.enable", false)) {
             int rate = plugin.getConfig().getInt("ponds." + name + ".effects.smoke_bottom.rate", 20);
             String particle = plugin.getConfig().getString("ponds." + name + ".effects.smoke_bottom.particle", "CAMPFIRE_COSY_SMOKE");
             list.add(Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
                 @Override
                 public void run() {
+                    // 调整基础数量为更低，避免过多；保持密度可控
                     spawnSmokeEffect(pond, particle, fallbackParticle, (int) Math.max(1, 4 * density));
                 }
             }, 20L, Math.max(1L, rate)));
@@ -134,7 +135,7 @@ public class EffectsManager {
         }
     }
     
-    // 烟雾特效 - 从水底生成并向上飘散
+    // 烟雾特效 - 从水面或覆盖方块顶部生成并向上飘散（避免生成在方块内部/水下）
     private void spawnSmokeEffect(Pond pond, String particle, String fallbackParticle, int count) {
         World w = Bukkit.getWorld(pond.getWorldName());
         if (w == null) return;
@@ -145,14 +146,20 @@ public class EffectsManager {
             int x = pond.getMinX() + r.nextInt(Math.max(1, pond.getMaxX() - pond.getMinX() + 1));
             int z = pond.getMinZ() + r.nextInt(Math.max(1, pond.getMaxZ() - pond.getMinZ() + 1));
             
-            // 确保在有水的位置生成烟雾
-            double waterSurface = findWaterSurface(w, x, z, pond.getMinY(), pond.getMaxY());
-            if (waterSurface > 0) {
-                // 从水底生成烟雾
-                Location loc = new Location(w, x + 0.5, pond.getMinY() + 0.5, z + 0.5);
-                // 烟雾只向上飘散，无水平偏移
-                particles.spawn(w, loc, particle, 1, fallbackParticle, 0.0, 0.1, 0.0, 0.02);
+            // 仅在存在水柱的列生成烟雾，位置取水面之上或覆盖方块顶部
+            double surfaceY = findWaterSurface(w, x, z, pond.getMinY(), pond.getMaxY());
+            if (surfaceY <= 0) continue; // 无水，不生成
+            int y = (int)Math.floor(surfaceY);
+            // 如果水面上方被方块覆盖，则将生成位置抬到覆盖方块的顶部之上
+            while (y <= pond.getMaxY()) {
+                org.bukkit.block.Block b = w.getBlockAt(x, y, z);
+                if (isAirMaterial(b.getType())) break; // 找到空气，停止上升（跨版本兼容）
+                y++;
             }
+            // 在最终位置微调以保证视觉效果在方块顶部/水面上
+            Location loc = new Location(w, x + 0.5, Math.min(y, pond.getMaxY()) + 0.05, z + 0.5);
+            // 垂直向上：取消水平偏移，设置极小速度，使用传入的数量
+            particles.spawn(w, loc, particle, Math.max(1, count), fallbackParticle, 0.0, 0.0, 0.0, 0.02);
         }
     }
     
@@ -192,5 +199,20 @@ public class EffectsManager {
         java.util.Random r = new java.util.Random();
         int selectedY = waterLevels.get(r.nextInt(waterLevels.size()));
         return new Location(world, x + 0.5, selectedY + 0.5, z + 0.5);
+    }
+
+    // 跨版本判断是否为空气方块：优先调用 Material#isAir()，否则回退到名称判断
+    private boolean isAirMaterial(org.bukkit.Material mat) {
+        if (mat == null) return false;
+        try {
+            java.lang.reflect.Method m = org.bukkit.Material.class.getMethod("isAir");
+            Object ret = m.invoke(mat);
+            if (ret instanceof Boolean) {
+                return ((Boolean) ret).booleanValue();
+            }
+        } catch (Throwable ignored) {}
+        // 回退：兼容没有 isAir 的版本，仅匹配已知空气类型
+        String name = mat.name();
+        return "AIR".equals(name) || "CAVE_AIR".equals(name) || "VOID_AIR".equals(name);
     }
 }

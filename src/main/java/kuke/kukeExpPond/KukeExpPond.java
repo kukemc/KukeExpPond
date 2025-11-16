@@ -24,6 +24,9 @@ import kuke.kukeExpPond.selection.SelectionManager;
 import kuke.kukeExpPond.selection.WandListener;
 import kuke.kukeExpPond.storage.DataStore;
 import kuke.kukeExpPond.ui.UiManager;
+import kuke.kukeExpPond.update.UpdateChecker;
+import kuke.kukeExpPond.update.UpdateNotificationListener;
+import kuke.kukeExpPond.xp.ExpAbsorbListener;
 import kuke.kukeExpPond.xp.XpBottleListener;
 import kuke.kukeExpPond.xp.XpManager;
 import org.bukkit.Bukkit;
@@ -43,11 +46,23 @@ public final class KukeExpPond extends JavaPlugin {
     private UiManager uiManager;
     private EffectsManager effectsManager;
     private IcePreventionManager icePreventionManager;
+    private UpdateChecker updateChecker;
 
     public KukeExpPond() {
     }
 
     public void onEnable() {
+
+        // 打印插件信息
+        getLogger().info("██╗  ██╗██╗   ██╗██╗  ██╗███████╗███████╗██╗  ██╗██████╗ ██████╗  ██████╗ ███╗   ██╗██████╗ ");
+        getLogger().info("██║ ██╔╝██║   ██║██║ ██╔╝██╔════╝██╔════╝╚██╗██╔╝██╔══██╗██╔══██╗██╔═══██╗████╗  ██║██╔══██╗");
+        getLogger().info("█████╔╝ ██║   ██║█████╔╝ █████╗  █████╗   ╚███╔╝ ██████╔╝██████╔╝██║   ██║██╔██╗ ██║██║  ██║");
+        getLogger().info("██╔═██╗ ██║   ██║██╔═██╗ ██╔══╝  ██╔══╝   ██╔██╗ ██╔═══╝ ██╔═══╝ ██║   ██║██║╚██╗██║██║  ██║");
+        getLogger().info("██║  ██╗╚██████╔╝██║  ██╗███████╗███████╗██╔╝ ██╗██║     ██║     ╚██████╔╝██║ ╚████║██████╔╝");
+        getLogger().info("╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝      ╚═════╝ ╚═╝  ╚═══╝╚═════╝ ");
+        getLogger().info("KukeExpPond " + getDescription().getVersion() + " by KukeMC");
+        getLogger().info("欢迎使用 KukeExpPond");
+
         this.log = this.getLogger();
         this.configManager = new ConfigManager(this);
         this.configManager.initialize();
@@ -66,6 +81,7 @@ public final class KukeExpPond extends JavaPlugin {
         this.getServer().getPluginManager().registerEvents(new MoveTeleportListener(this, this.pondManager, this.playerStateManager), this);
         this.getServer().getPluginManager().registerEvents(new XpBottleListener(this), this);
         this.getServer().getPluginManager().registerEvents(new IcePreventListener(this, this.pondManager), this);
+        this.getServer().getPluginManager().registerEvents(new ExpAbsorbListener(this), this);
         this.rewardManager = new RewardManager(this, this.pondManager, this.hooks, this.dataStore);
         this.rewardManager.start();
         this.xpManager = new XpManager(this, this.pondManager);
@@ -98,6 +114,17 @@ public final class KukeExpPond extends JavaPlugin {
             this.log.warning("Command 'kukeexppond' not found in plugin.yml");
         }
 
+        // 初始化更新检测器
+        this.updateChecker = new UpdateChecker(this);
+        
+        // 注册管理员登录更新提示监听器
+        Bukkit.getPluginManager().registerEvents(new UpdateNotificationListener(this, this.updateChecker), this);
+        
+        // 启动时检测更新（如果配置启用）
+        if (this.getConfig().getBoolean("general.update_checker.enable", true) &&
+            this.getConfig().getBoolean("general.update_checker.check_on_startup", true)) {
+            this.updateChecker.checkForUpdates();
+        }
     }
 
     public void onDisable() {
@@ -153,6 +180,18 @@ public final class KukeExpPond extends JavaPlugin {
 
     public PlayerStateManager getPlayerStateManager() {
         return this.playerStateManager;
+    }
+
+    public UpdateChecker getUpdateChecker() {
+        return this.updateChecker;
+    }
+
+    public DataStore getDataStore() {
+        return this.dataStore;
+    }
+
+    public RewardManager getRewardManager() {
+        return this.rewardManager;
     }
 
     public void rebuildPonds() {

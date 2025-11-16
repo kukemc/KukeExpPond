@@ -59,29 +59,74 @@ public class XpManager {
         String name = pond.getName();
         String mode = plugin.getConfig().getString("ponds." + name + ".mode.xp_mode", "bottle");
         if ("direct".equalsIgnoreCase(mode)) {
-            int speed = plugin.getConfig().getInt("ponds." + name + ".reward.exp.speed", 10);
-            int count = plugin.getConfig().getInt("ponds." + name + ".reward.exp.count", 5);
             boolean enable = plugin.getConfig().getBoolean("ponds." + name + ".reward.exp.enable", true);
-            if (!enable || speed <= 0 || count <= 0) return;
-            BukkitTask t = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, new Runnable() {
-                @Override
-                public void run() {
-                    final List<Player> players = listPlayersInPond(pond);
-                    if (players.isEmpty()) return;
-                    Bukkit.getScheduler().runTask(plugin, new Runnable() {
-                        @Override
-                        public void run() {
-                            for (Player p : players) {
-                                if (!isEligibleForXp(p, pond)) continue;
-                                p.giveExp(count);
-                                new ChatUtil(plugin).send(p, "&a获得经验: &e" + count);
+            if (!enable) return;
+
+            // 配置简化：优先使用 reward.exp.mode 与 per_tick/interval_ticks；兼容旧的 continuous / per_second / speed
+            String expModeStr = plugin.getConfig().getString("ponds." + name + ".reward.exp.mode", null);
+            boolean continuousLegacy = plugin.getConfig().getBoolean("ponds." + name + ".reward.exp.continuous", expModeStr == null);
+            boolean isContinuous = expModeStr != null ? "continuous".equalsIgnoreCase(expModeStr) : continuousLegacy;
+
+            if (isContinuous) {
+                // 每tick发放，默认使用 per_tick；无则回退到 per_second 或 count
+                int perTick = plugin.getConfig().getInt(
+                        "ponds." + name + ".reward.exp.per_tick",
+                        plugin.getConfig().getInt(
+                                "ponds." + name + ".reward.exp.per_second",
+                                plugin.getConfig().getInt("ponds." + name + ".reward.exp.count", 1)
+                        )
+                );
+                int tickPeriod = Math.max(1, plugin.getConfig().getInt(
+                        "ponds." + name + ".reward.exp.tick_period",
+                        1
+                ));
+                if (perTick <= 0) return;
+                BukkitTask t = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, new Runnable() {
+                    @Override
+                    public void run() {
+                        final List<Player> players = listPlayersInPond(pond);
+                        if (players.isEmpty()) return;
+                        // 在主线程发放经验
+                        Bukkit.getScheduler().runTask(plugin, new Runnable() {
+                            @Override
+                            public void run() {
+                                for (Player p : players) {
+                                    if (!isEligibleForXp(p, pond)) continue;
+                                    p.giveExp(perTick);
+                                }
                             }
-                        }
-                    });
-                }
-            }, 20L * speed, 20L * speed);
-            xpTasks.put(name, t);
-            return;
+                        });
+                    }
+                }, tickPeriod, tickPeriod); // 可调周期（默认每tick）
+                xpTasks.put(name, t);
+                return;
+            } else {
+                // 间隔模式：使用 interval_ticks；回退到 speed（秒）与 count
+                int intervalTicks = plugin.getConfig().getInt(
+                        "ponds." + name + ".reward.exp.interval_ticks",
+                        20 * Math.max(1, plugin.getConfig().getInt("ponds." + name + ".reward.exp.speed", 10))
+                );
+                int count = plugin.getConfig().getInt("ponds." + name + ".reward.exp.count", 5);
+                if (intervalTicks <= 0 || count <= 0) return;
+                BukkitTask t = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, new Runnable() {
+                    @Override
+                    public void run() {
+                        final List<Player> players = listPlayersInPond(pond);
+                        if (players.isEmpty()) return;
+                        Bukkit.getScheduler().runTask(plugin, new Runnable() {
+                            @Override
+                            public void run() {
+                                for (Player p : players) {
+                                    if (!isEligibleForXp(p, pond)) continue;
+                                    p.giveExp(count);
+                                }
+                            }
+                        });
+                    }
+                }, intervalTicks, intervalTicks);
+                xpTasks.put(name, t);
+                return;
+            }
         }
 
         // bottle mode

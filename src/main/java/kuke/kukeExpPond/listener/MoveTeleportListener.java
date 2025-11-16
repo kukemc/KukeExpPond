@@ -117,7 +117,14 @@ public class MoveTeleportListener implements Listener {
     private void showJoinTitle(Player p) {
         // read config titles for join
         org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
-        String base = "ponds." + kuke.kukeExpPond.config.ConfigManager.class.cast(plugin.getConfigManager()).normalizePondName(states.getCurrentPond(p.getUniqueId())) + ".ui.title.";
+        String currentPond = states.getCurrentPond(p.getUniqueId());
+        String rawBase = "ponds." + currentPond + ".ui.title.";
+        String normName = plugin.getConfigManager().normalizePondName(currentPond);
+        String normBase = "ponds." + normName + ".ui.title.";
+        // 优先使用原始池名键；若不存在则回退到规范化键，避免大小写不一致导致找不到配置
+        String base = cfg.contains(rawBase + "join_title") || cfg.isConfigurationSection("ponds." + currentPond + ".ui.title")
+                ? rawBase
+                : normBase;
         String title = cfg.getString(base + "join_title", "&b欢迎来到经验温泉");
         String sub = cfg.getString(base + "join_subTitle", "");
         int fi = cfg.getInt(base + "fadeIn", 10);
@@ -128,7 +135,13 @@ public class MoveTeleportListener implements Listener {
 
     private void showLeaveTitle(Player p) {
         org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
-        String base = "ponds." + kuke.kukeExpPond.config.ConfigManager.class.cast(plugin.getConfigManager()).normalizePondName(states.getCurrentPond(p.getUniqueId())) + ".ui.title.";
+        String currentPond = states.getCurrentPond(p.getUniqueId());
+        String rawBase = "ponds." + currentPond + ".ui.title.";
+        String normName = plugin.getConfigManager().normalizePondName(currentPond);
+        String normBase = "ponds." + normName + ".ui.title.";
+        String base = cfg.contains(rawBase + "leave_title") || cfg.isConfigurationSection("ponds." + currentPond + ".ui.title")
+                ? rawBase
+                : normBase;
         String title = cfg.getString(base + "leave_title", "&7你离开了经验温泉");
         String sub = cfg.getString(base + "leave_subTitle", "");
         int fi = cfg.getInt(base + "fadeIn", 10);

@@ -7,6 +7,11 @@ import kuke.kukeExpPond.selection.SelectionManager;
 import kuke.kukeExpPond.selection.WandListener;
 import kuke.kukeExpPond.util.ChatUtil;
 import kuke.kukeExpPond.importer.NextConfigImporter;
+import kuke.kukeExpPond.storage.DataStore;
+import kuke.kukeExpPond.pond.PondManager;
+import kuke.kukeExpPond.pond.Pond;
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -24,12 +29,16 @@ public class KepCommand implements CommandExecutor {
     private final ChatUtil chat;
     private final SelectionManager selections;
     private final ConfigManager cfgMgr;
+    private final DataStore dataStore;
+    private final PondManager pondManager;
 
     public KepCommand(KukeExpPond plugin) {
         this.plugin = plugin;
         this.chat = new ChatUtil(plugin);
         this.selections = plugin.getSelectionManager();
         this.cfgMgr = plugin.getConfigManager();
+        this.dataStore = plugin.getDataStore();
+        this.pondManager = plugin.getPondManager();
     }
 
     @Override
@@ -49,6 +58,71 @@ public class KepCommand implements CommandExecutor {
             cfgMgr.reload();
             plugin.rebuildPonds();
             chat.send(sender, "&a配置已重载");
+            return true;
+        }
+        if ("resetday".equals(sub)) {
+            if (!sender.hasPermission("kukeexppond.admin")) {
+                chat.send(sender, "&c你没有权限执行此命令");
+                return true;
+            }
+            // 用法：/kep resetday <玩家> <池名> <money|points|both>
+            if (args.length < 4) {
+                chat.send(sender, "&e用法: /" + label + " resetday <玩家> <池名> <money|points|both>");
+                return true;
+            }
+            String playerName = args[1];
+            String pondName = args[2];
+            String type = args[3].toLowerCase();
+
+            Pond pond = pondManager.getByName(pondName);
+            if (pond == null) {
+                chat.send(sender, "&c未找到池: &f" + pondName);
+                return true;
+            }
+
+            OfflinePlayer op = Bukkit.getOfflinePlayer(playerName);
+            if (op == null || op.getUniqueId() == null) {
+                chat.send(sender, "&c未找到玩家: &f" + playerName);
+                return true;
+            }
+
+            java.util.UUID uuid = op.getUniqueId();
+            boolean changed = false;
+            if ("money".equals(type) || "both".equals(type) || "all".equals(type)) {
+                dataStore.resetDailyMoney(uuid, pond.getName());
+                changed = true;
+            }
+            if ("points".equals(type) || "both".equals(type) || "all".equals(type)) {
+                dataStore.resetDailyPoints(uuid, pond.getName());
+                changed = true;
+            }
+            if (!changed) {
+                chat.send(sender, "&e类型必须是 money、points 或 both");
+                return true;
+            }
+            dataStore.save();
+            chat.send(sender, "&a已重置 &f" + playerName + " &a在池 &f" + pond.getName() + " &a的今日" + ("money".equals(type) ? "金币" : ("points".equals(type) ? "点券" : "金币与点券")) + "计数为 0");
+            return true;
+        }
+        if ("updateponds".equals(sub)) {
+            if (!sender.hasPermission("kukeexppond.admin")) {
+                chat.send(sender, "&c你没有权限执行此命令");
+                return true;
+            }
+            try {
+                boolean updated = plugin.getConfigUpdater().updateExistingPonds();
+                if (updated) {
+                    chat.send(sender, "&a成功为现有挂机池添加了新的配置项");
+                    cfgMgr.reload();
+                    plugin.rebuildPonds();
+                    chat.send(sender, "&a配置已重载");
+                } else {
+                    chat.send(sender, "&e所有挂机池的配置都已是最新版本，无需更新");
+                }
+            } catch (Exception e) {
+                chat.send(sender, "&c更新挂机池配置失败: " + e.getMessage());
+                plugin.getLogger().log(java.util.logging.Level.WARNING, "更新挂机池配置失败", e);
+            }
             return true;
         }
         if ("updateconfig".equals(sub)) {
@@ -178,21 +252,17 @@ public class KepCommand implements CommandExecutor {
             String pondName = cfgMgr.normalizePondName(rawName);
             org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
             String base = "ponds." + pondName + ".";
+            // 先将默认池模板拷贝到新池，生成完整配置结构
+            cfgMgr.applyDefaultPondTemplate(pondName);
+            // 再覆写与当前选择相关的世界与区域
             cfg.set(base + "world", sel.getWorldName());
             writeRegion(cfg, base + "region.", sel.getPos1(), sel.getPos2());
-            // set defaults for permission and mode
+            // 自定义权限节点以匹配池名
             cfg.set(base + "permission.pond_permission", "pond." + pondName);
             cfg.set(base + "permission.pond_join", Boolean.TRUE);
             cfg.set(base + "permission.bypass_permission", "kukeexppond.bypass");
-            cfg.set(base + "mode.xp_mode", "bottle");
-            // basic bottle defaults
-            cfg.set(base + "bottle.enable", Boolean.TRUE);
-            cfg.set(base + "bottle.bottle_speed", 5);
-            cfg.set(base + "bottle.bottle_count", 3);
-            cfg.set(base + "bottle.only_above_water", Boolean.TRUE);
-            cfg.set(base + "bottle.drop_height", 4.0);
             plugin.saveConfig();
-            chat.send(p, "&a已创建池 &b" + pondName + " &7(世界=" + sel.getWorldName() + ")");
+            chat.send(p, "&a已创建池 &b" + pondName + " &7(世界=" + sel.getWorldName() + ")，已填充默认模板配置");
             return true;
         }
         if ("setregion".equals(sub)) {
@@ -269,6 +339,8 @@ public class KepCommand implements CommandExecutor {
         chat.sendNoPrefix(sender, "&b" + cmd + " list &7- 列出所有已配置池及模式/瓶状态");
         chat.sendNoPrefix(sender, "&b" + cmd + " info <池名> &7- 查看指定池的世界、区域、模式、权限等详情");
         chat.sendNoPrefix(sender, "&b" + cmd + " reload &7- 重载配置并重建奖励/经验/展示等任务");
+        chat.sendNoPrefix(sender, "&b" + cmd + " resetday <玩家> <池名> <money|points|both> &7- 重置指定玩家在池的今日金币/点券计数");
+        chat.sendNoPrefix(sender, "&b" + cmd + " updateponds &7- 为现有挂机池自动添加新的配置项");
         chat.sendNoPrefix(sender, "&b" + cmd + " updateconfig &7- 检查并自动添加缺失的配置项（旧版）");
         chat.sendNoPrefix(sender, "&b" + cmd + " checkconfig &7- 使用新配置管理器检查并补充缺失配置项");
         chat.sendNoPrefix(sender, "&b" + cmd + " validateconfig &7- 验证配置文件的完整性和有效性");

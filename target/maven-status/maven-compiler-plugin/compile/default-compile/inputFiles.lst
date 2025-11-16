@@ -19,10 +19,13 @@ D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\selection\S
 D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\selection\WandListener.java
 D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\storage\DataStore.java
 D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\ui\UiManager.java
+D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\update\UpdateChecker.java
+D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\update\UpdateNotificationListener.java
 D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\util\ActionBarUtil.java
 D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\util\ChatUtil.java
 D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\util\ParticleUtil.java
 D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\util\SoundUtil.java
 D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\util\TitleUtil.java
+D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\xp\ExpAbsorbListener.java
 D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\xp\XpBottleListener.java
 D:\编程\MinecraftPlugin\KukeExpPond\src\main\java\kuke\kukeExpPond\xp\XpManager.java

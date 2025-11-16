@@ -1,5 +1,5 @@
 name: KukeExpPond
-version: 1.0-SNAPSHOT
+version: 1.1-SNAPSHOT
 main: kuke.kukeExpPond.KukeExpPond
 api-version: 1.13
 authors: [Kuke]

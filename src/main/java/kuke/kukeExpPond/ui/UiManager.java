@@ -124,8 +124,11 @@ public class UiManager {
                 String title = chat.color("&b" + pondName);
                 Object color = Enum.valueOf((Class<Enum>) barColorClass, safeEnum(barColorClass, plugin.getConfig().getString("ponds." + pondName + ".ui.bossbar.color", "BLUE"), "BLUE"));
                 Object style = Enum.valueOf((Class<Enum>) barStyleClass, safeEnum(barStyleClass, plugin.getConfig().getString("ponds." + pondName + ".ui.bossbar.style", "SEGMENTED_10"), "SEGMENTED_10"));
-                bar = bossBarClass.getMethod("createBossBar", String.class, barColorClass, barStyleClass).invoke(Bukkit.class, title, color, style);
+                // 兼容创建：优先使用 (String, BarColor, BarStyle)，回退到含 BarFlag... 的重载
+                bar = createBossBarCompat(title, color, style);
                 bossBarClass.getMethod("addPlayer", Player.class).invoke(bar, p);
+                // 一些服务端需要显式设置可见
+                try { bossBarClass.getMethod("setVisible", boolean.class).invoke(bar, true); } catch (Throwable ignored) {}
                 bossBars.put(id, bar);
             }
             // Title: show combined info
@@ -134,21 +137,78 @@ public class UiManager {
             int moneyMax = plugin.getConfig().getInt("ponds." + pondName + ".reward.money.max", 0);
             int pointsMax = plugin.getConfig().getInt("ponds." + pondName + ".reward.points.max", 0);
             int onlineInPond = countPlayersInPond(pondName);
-            int nextSpeed = minRewardSpeed(pondName);
-            String title = String.format("&b%s&7: 金币 %d/%d | 点券 %d/%d | 在线 %d | 下次奖励 %ds",
-                    pondName, moneyToday, moneyMax, pointsToday, pointsMax, onlineInPond, nextSpeed);
+            boolean moneyEnabled = plugin.getConfig().getBoolean("ponds." + pondName + ".reward.money.enable", false)
+                    && plugin.getHooks().isVaultPresent();
+            boolean pointsEnabled = plugin.getConfig().getBoolean("ponds." + pondName + ".reward.points.enable", false)
+                    && plugin.getHooks().isPlayerPointsPresent();
+
+            List<String> segs = new ArrayList<String>();
+            if (moneyEnabled) {
+                segs.add(String.format("金币 %d/%d", moneyToday, moneyMax));
+            }
+            if (pointsEnabled) {
+                segs.add(String.format("点券 %d/%d", pointsToday, pointsMax));
+            }
+            segs.add(String.format("在线 %d", onlineInPond));
+            int nextRemain = 0;
+            try {
+                if (plugin.getRewardManager() != null) {
+                    nextRemain = plugin.getRewardManager().getNextRemainingSeconds(pondName);
+                } else {
+                    nextRemain = minRewardSpeed(pondName);
+                }
+            } catch (Throwable ignored) {
+                nextRemain = minRewardSpeed(pondName);
+            }
+            segs.add(String.format("下次奖励 %ds", nextRemain));
+            String title = "&b" + pondName + "&7: " + String.join(" | ", segs);
             bossBarClass.getMethod("setTitle", String.class).invoke(bar, chat.color(title));
             double progress = 0.0d;
-            if (moneyMax > 0) {
+            if (moneyEnabled && moneyMax > 0) {
                 progress = Math.max(0.0d, Math.min(1.0d, moneyToday / (double) moneyMax));
-            } else if (pointsMax > 0) {
+            } else if (pointsEnabled && pointsMax > 0) {
                 progress = Math.max(0.0d, Math.min(1.0d, pointsToday / (double) pointsMax));
             }
             bossBarClass.getMethod("setProgress", double.class).invoke(bar, progress);
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
             // On any error, drop bossbar and fallback to actionbar
             removeBossBar(p.getUniqueId());
+            try {
+                if (plugin.getConfig().getBoolean("general.debug", false)) {
+                    plugin.getLogger().warning("[UI] BossBar 创建/更新失败: " + t.getClass().getName() + ": " + t.getMessage());
+                }
+            } catch (Throwable ignoredLog) {}
         }
+    }
+
+    // 适配不同 Bukkit 版本的 BossBar 创建方法
+    private Object createBossBarCompat(String title, Object color, Object style) throws Throwable {
+        Class<?> barColorClass = Class.forName("org.bukkit.boss.BarColor");
+        Class<?> barStyleClass = Class.forName("org.bukkit.boss.BarStyle");
+        // 1) 直接尝试常见的三参重载
+        try {
+            return Bukkit.class.getMethod("createBossBar", String.class, barColorClass, barStyleClass)
+                    .invoke(null, title, color, style);
+        } catch (NoSuchMethodException ignored) {}
+
+        // 2) 兼容含 BarFlag... 的四参重载
+        try {
+            Class<?> barFlagClass = Class.forName("org.bukkit.boss.BarFlag");
+            // 反射查找匹配的方法，避免不同实现的签名细节差异
+            for (java.lang.reflect.Method m : Bukkit.class.getMethods()) {
+                if (!"createBossBar".equals(m.getName())) continue;
+                Class<?>[] ps = m.getParameterTypes();
+                if (ps.length == 4 && ps[0] == String.class && ps[1].isAssignableFrom(barColorClass)
+                        && ps[2].isAssignableFrom(barStyleClass) && ps[3].isArray()
+                        && ps[3].getComponentType().getName().equals(barFlagClass.getName())) {
+                    Object emptyFlags = java.lang.reflect.Array.newInstance(ps[3].getComponentType(), 0);
+                    return m.invoke(null, title, color, style, emptyFlags);
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        // 3) 如果仍未找到，抛出异常以便上层回退 actionbar
+        throw new NoSuchMethodException("No compatible Bukkit#createBossBar found");
     }
 
     private String safeEnum(Class<?> enumClass, String value, String def) {

@@ -29,6 +29,19 @@ public class ConfigUpdater {
     }
     
     /**
+     * 设置配置版本
+     */
+    public void setConfigVersion(String version) {
+        plugin.getConfig().set("config_version", version);
+        try {
+            File configFile = new File(plugin.getDataFolder(), "config.yml");
+            plugin.getConfig().save(configFile);
+        } catch (IOException e) {
+            logger.severe("[配置更新] 保存配置版本失败: " + e.getMessage());
+        }
+    }
+    
+    /**
      * 检查并更新配置文件
      * @return 是否有配置项被添加
      */
@@ -174,15 +187,134 @@ public class ConfigUpdater {
     }
     
     /**
-     * 设置配置版本
+     * 为现有的挂机池配置自动添加新的配置项
+     * 这个方法专门用于更新已存在的池配置，添加我们新增的功能配置
      */
-    public void setConfigVersion(String version) {
-        plugin.getConfig().set("config_version", version);
+    public boolean updateExistingPonds() {
+        addedKeys.clear();
+        boolean hasChanges = false;
+        
         try {
-            File configFile = new File(plugin.getDataFolder(), "config.yml");
-            plugin.getConfig().save(configFile);
-        } catch (IOException e) {
-            logger.severe("[配置更新] 保存配置版本失败: " + e.getMessage());
+            FileConfiguration config = plugin.getConfig();
+            ConfigurationSection pondsSection = config.getConfigurationSection("ponds");
+            
+            if (pondsSection == null) {
+                logger.info("[配置更新] 没有找到现有的池配置");
+                return false;
+            }
+            
+            logger.info("[配置更新] 开始为现有池添加新配置项...");
+            
+            Set<String> pondNames = pondsSection.getKeys(false);
+            int updatedPonds = 0;
+            
+            for (String pondName : pondNames) {
+                ConfigurationSection pondSection = pondsSection.getConfigurationSection(pondName);
+                if (pondSection == null) continue;
+                
+                boolean pondUpdated = false;
+                
+                // 更新经验奖励配置
+                ConfigurationSection rewardSection = pondSection.getConfigurationSection("reward");
+                if (rewardSection != null) {
+                    ConfigurationSection expSection = rewardSection.getConfigurationSection("exp");
+                    if (expSection != null) {
+                        pondUpdated |= updateExpRewardConfig(expSection, pondName);
+                    }
+                }
+                
+                if (pondUpdated) {
+                    updatedPonds++;
+                    hasChanges = true;
+                }
+            }
+            
+            // 如果有变化，保存配置文件
+            if (hasChanges) {
+                File configFile = new File(plugin.getDataFolder(), "config.yml");
+                config.save(configFile);
+                logger.info("[配置更新] 成功更新了 " + updatedPonds + " 个池的配置，添加了 " + addedKeys.size() + " 个新配置项");
+                
+                // 重新加载配置
+                plugin.reloadConfig();
+                return true;
+            } else {
+                logger.info("[配置更新] 所有池的配置都已是最新版本");
+                return false;
+            }
+            
+        } catch (Exception e) {
+            logger.severe("[配置更新] 更新现有池配置时发生错误: " + e.getMessage());
+            java.util.logging.Level level = java.util.logging.Level.SEVERE;
+            logger.log(level, "[配置更新] 异常详情", e);
+            return false;
         }
+    }
+    
+    /**
+     * 更新单个池的经验奖励配置
+     */
+    private boolean updateExpRewardConfig(ConfigurationSection expSection, String pondName) {
+        boolean updated = false;
+        String basePath = "ponds." + pondName + ".reward.exp";
+        
+        // 检查并添加新的配置项
+        
+        // 1. 添加 mode 配置（如果没有）
+        if (!expSection.contains("mode")) {
+            // 根据现有配置推断模式
+            String mode = "interval"; // 默认间隔模式
+            if (expSection.contains("continuous") && expSection.getBoolean("continuous", false)) {
+                mode = "continuous";
+            }
+            expSection.set("mode", mode);
+            addedKeys.add(basePath + ".mode");
+            updated = true;
+        }
+        
+        // 2. 添加 per_tick 配置（如果没有）
+        if (!expSection.contains("per_tick")) {
+            // 从旧的 per_second 配置推断，或使用默认值
+            int perTick = 1;
+            if (expSection.contains("per_second")) {
+                int perSecond = expSection.getInt("per_second", 20);
+                perTick = Math.max(1, perSecond / 20); // 转换为每tick的经验
+            }
+            expSection.set("per_tick", perTick);
+            addedKeys.add(basePath + ".per_tick");
+            updated = true;
+        }
+        
+        // 3. 添加 tick_period 配置（如果没有）
+        if (!expSection.contains("tick_period")) {
+            expSection.set("tick_period", 1);
+            addedKeys.add(basePath + ".tick_period");
+            updated = true;
+        }
+        
+        // 4. 添加 interval_ticks 配置（如果没有）
+        if (!expSection.contains("interval_ticks")) {
+            // 从旧的 speed 配置推断，或使用默认值
+            int intervalTicks = 100;
+            if (expSection.contains("speed")) {
+                intervalTicks = expSection.getInt("speed", 100);
+            }
+            expSection.set("interval_ticks", intervalTicks);
+            addedKeys.add(basePath + ".interval_ticks");
+            updated = true;
+        }
+        
+        // 5. 确保 count 配置存在
+        if (!expSection.contains("count")) {
+            expSection.set("count", 1);
+            addedKeys.add(basePath + ".count");
+            updated = true;
+        }
+        
+        if (updated) {
+            logger.info("[配置更新] 池 '" + pondName + "' 的经验配置已更新");
+        }
+        
+        return updated;
     }
 }

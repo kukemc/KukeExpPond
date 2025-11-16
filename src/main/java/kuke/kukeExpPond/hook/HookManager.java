@@ -114,15 +114,79 @@ public class HookManager {
     public boolean isBStatsPresent() { return bStatsPresent; }
 
     // Minimal wrappers for future rewards (safe no-ops when missing)
-    public boolean depositMoney(java.util.UUID uuid, double amount) {
-        if (!vaultPresent || economyProvider == null || amount <= 0) return false;
+    // Prefer OfflinePlayer/String signatures for broad Vault compatibility
+    public boolean depositMoney(org.bukkit.OfflinePlayer player, double amount) {
+        if (!vaultPresent || economyProvider == null || amount <= 0 || player == null) return false;
         try {
             Class<?> economyClass = Class.forName("net.milkbowl.vault.economy.Economy");
-            Method depositPlayer = economyClass.getMethod("depositPlayer", java.util.UUID.class, double.class);
-            Object resp = depositPlayer.invoke(economyProvider, uuid, amount);
-            // EconomyResponse#transactionSuccess()
-            Method success = resp.getClass().getMethod("transactionSuccess");
-            return (Boolean) success.invoke(resp);
+
+            // Ensure account exists when economy requires explicit creation
+            try {
+                Method hasAccount = economyClass.getMethod("hasAccount", org.bukkit.OfflinePlayer.class);
+                Object has = hasAccount.invoke(economyProvider, player);
+                if (has instanceof Boolean && !((Boolean) has)) {
+                    try {
+                        Method createAccount = economyClass.getMethod("createPlayerAccount", org.bukkit.OfflinePlayer.class);
+                        createAccount.invoke(economyProvider, player);
+                    } catch (Throwable ignoredCreate) {}
+                }
+            } catch (Throwable ignoredHas) {}
+
+            // Primary path: OfflinePlayer
+            try {
+                Method depositOffline = economyClass.getMethod("depositPlayer", org.bukkit.OfflinePlayer.class, double.class);
+                Object resp = depositOffline.invoke(economyProvider, player, amount);
+                Method success = resp.getClass().getMethod("transactionSuccess");
+                return (Boolean) success.invoke(resp);
+            } catch (Throwable tryNameInstead) {
+                // Fallback: player name
+                String name = player.getName();
+                if (name == null || name.trim().isEmpty()) {
+                    // As a last resort, try UUID signature if provider supports it
+                    try {
+                        Method depositUuid = economyClass.getMethod("depositPlayer", java.util.UUID.class, double.class);
+                        Object resp = depositUuid.invoke(economyProvider, player.getUniqueId(), amount);
+                        Method success = resp.getClass().getMethod("transactionSuccess");
+                        return (Boolean) success.invoke(resp);
+                    } catch (Throwable noUuidSupport) {
+                        if (isDebug()) {
+                            log.info("[Vault] 经济发放失败（无可用签名）: " + player.getUniqueId());
+                        }
+                        return false;
+                    }
+                }
+                try {
+                    Method depositName = economyClass.getMethod("depositPlayer", String.class, double.class);
+                    Object resp = depositName.invoke(economyProvider, name, amount);
+                    Method success = resp.getClass().getMethod("transactionSuccess");
+                    return (Boolean) success.invoke(resp);
+                } catch (Throwable t2) {
+                    // As a last resort, try UUID signature
+                    try {
+                        Method depositUuid = economyClass.getMethod("depositPlayer", java.util.UUID.class, double.class);
+                        Object resp = depositUuid.invoke(economyProvider, player.getUniqueId(), amount);
+                        Method success = resp.getClass().getMethod("transactionSuccess");
+                        return (Boolean) success.invoke(resp);
+                    } catch (Throwable noUuidSupport) {
+                        if (isDebug()) {
+                            log.info("[Vault] 经济发放失败: " + name + " (" + player.getUniqueId() + ")");
+                        }
+                        return false;
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            if (isDebug()) {
+                log.info("[Vault] 经济发放异常: " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            }
+            return false;
+        }
+    }
+
+    public boolean depositMoney(java.util.UUID uuid, double amount) {
+        try {
+            org.bukkit.OfflinePlayer op = Bukkit.getOfflinePlayer(uuid);
+            return depositMoney(op, amount);
         } catch (Throwable t) {
             return false;
         }
