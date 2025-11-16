@@ -49,6 +49,9 @@
 # 从 Exppond-Next 导入（覆盖同名池）
 /kep importnext override
 ```
+
+## config.yml 配置文件
+```yaml
 ############################################
 # KukeExpPond 配置文件 (1.8–1.21 兼容)
 # 所有配置均可热重载。
