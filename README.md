@@ -49,9 +49,6 @@
 # 从 Exppond-Next 导入（覆盖同名池）
 /kep importnext override
 ```
-
-## config.yml 配置文件
-```yaml
 ############################################
 # KukeExpPond 配置文件 (1.8–1.21 兼容)
 # 所有配置均可热重载。
@@ -69,8 +66,8 @@
 # - 文本支持彩色代码（&a/&b 等），按服务端显示规则渲染。
 ############################################
 
-# 配置文件版本（用于自动更新检测，缺失时会自动补全）
-config_version: "1.2.0"
+# 配置文件版本（请勿修改）
+config_version: "1.0.0"
 
 general:
   # 全局消息前缀
@@ -88,6 +85,19 @@ general:
     check_interval: 30                # 检查间隔（秒）
     convert_ice_to_water: true        # 是否将冰块转换为水
     debug_log: false                  # 是否记录防结冰调试日志
+  # 更新检测配置
+  update_checker:
+    enable: true                      # 是否启用更新检测
+    check_on_startup: true            # 启动时检测更新
+    notify_admins_on_join: true       # 管理员登录时提示更新
+    github_repo: "kukemc/KukeExpPond" # GitHub仓库地址
+    check_interval: 3600              # 检查间隔（秒），默认1小时
+  # 经验瞬间吸收配置
+  instant_exp_absorb:
+    enable: true                      # 是否启用经验瞬间吸收功能
+    search_radius: 2.0                # 搜索附近玩家的半径（方块）
+    delay_ticks: 1                    # 延迟处理的tick数（确保经验球完全生成）
+    play_sound: true                  # 是否播放吸收音效
   version_mapping:
     # 粒子/音效的跨版本回退策略，仅示例（找不到枚举时使用这些回退）
     particle_fallback: CLOUD
@@ -116,9 +126,13 @@ ponds:
       drop_height: 4.0                  # 瓶子生成相对高度（米），从玩家附近位置往上抬高后投掷
     reward:
       exp:
+        # direct 模式下的经验配置
         enable: true
-        speed: 10                      # 直接模式下每周期给予经验
-        count: 5                       # 每周期经验点数
+        mode: interval              # continuous 连续模式 | interval 间隔模式
+        per_tick: 1                   # 连续模式配置：每tick给予的经验点数（默认取 count）
+        tick_period: 20                # 连续模式配置：每隔多少tick发放一次（默认1，每tick）
+        interval_ticks: 200           # 间隔模式配置：两次发放之间的tick数（20tick=1秒）
+        count: 5                      # 间隔模式/瓶模式下每次发放点数
       money:
         enable: true
         speed: 10                       # 发放周期（秒）
@@ -179,7 +193,7 @@ ponds:
       smoke_bottom:               #  烟雾特效
         enable: true
         rate: 20
-        particle: CAMPFIRE_COSY_SMOKE
+        particle: CAMPFIRE_SIGNAL_SMOKE
       density: 1.0
     teleport:
       block_enter_by_teleport: true
