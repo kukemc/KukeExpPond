@@ -1,4 +1,4 @@
-# KukeExpPond - 多池经验温泉与奖励插件
+# KukeExpPond - 新一代的现代化 经验挂机池 插件
 
 [English README](./README.en.md)
 
@@ -6,10 +6,12 @@
 
 ## 功能
 - 支持多池管理（按世界与选区配置多个池）
-- 支持瓶模式与直接模式经验发放
+- 支持使用工具快捷创建经验池选取
+- 支持经验瓶模式与直接模式经验发放
 - 支持金币、点券与自定义指令奖励
 - 支持每日重置与补偿重置（服务器错过预定时间时）
 - 支持 ActionBar、BossBar、Title 展示
+- 支持粒子特效，拥有沉浸真实的温泉效果
 - 支持传送进入拦截与绕过权限
 - 支持防结冰系统与调试日志开关
 - 支持配置热重载与自动补全缺失项
@@ -204,7 +206,8 @@ ponds:
 
 
 ## 插件截图
-![screenshot](https://github.com/user-attachments/assets/83408843-b970-4474-8637-5865eaba800d)
+<img width="886" height="315" alt="PixPin_2025-10-29_02-43-15" src="https://github.com/user-attachments/assets/89988da0-f071-4f3c-916f-bcc00e228d01" />
+
 
 ## 反馈
 - QQ 讨论群：`981954623`
