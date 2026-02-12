@@ -44,6 +44,7 @@ kuke\kukeExpPond\command\KepTab.class
 kuke\kukeExpPond\config\ConfigManager.class
 kuke\kukeExpPond\config\ConfigUpdater.class
 kuke\kukeExpPond\update\UpdateChecker.class
+kuke\kukeExpPond\ui\UiManager$BarConfig.class
 kuke\kukeExpPond\ui\UiManager$1.class
 kuke\kukeExpPond\update\UpdateNotificationListener$1.class
 kuke\kukeExpPond\util\SoundUtil.class

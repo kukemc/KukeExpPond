@@ -32,6 +32,10 @@ public class EffectsManager {
 
     public void start() {
         stop();
+        // Check global switch
+        if (!plugin.getConfig().getBoolean("general.enable_effects", true)) {
+            return;
+        }
         for (Pond pond : pondManager.listAll()) {
             startPond(pond);
         }

@@ -142,6 +142,7 @@ public class RewardManager {
         // command
         boolean cmdEnable = plugin.getConfig().getBoolean("ponds." + name + ".reward.command.enable", false);
         int cmdSpeed = plugin.getConfig().getInt("ponds." + name + ".reward.command.speed", 0);
+        int cmdMax = plugin.getConfig().getInt("ponds." + name + ".reward.command.max", 0);
         List<String> cmds = plugin.getConfig().getStringList("ponds." + name + ".reward.command.commands");
         if (cmdEnable && cmdSpeed > 0 && cmds != null && !cmds.isEmpty()) {
             commandSpeedSec.put(name, cmdSpeed);
@@ -149,11 +150,15 @@ public class RewardManager {
             BukkitTask t = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
                 for (Player p : listPlayersInPond(pond)) {
                     if (!isEligibleForReward(p, pond)) continue;
+                    java.util.UUID id = p.getUniqueId();
+                    int daily = dataStore.getDailyCommand(id, name);
+                    if (cmdMax > 0 && daily + 1 > cmdMax) continue;
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         for (String cmd : cmds) {
                             String processed = cmd.replace("{player}", p.getName());
                             Bukkit.dispatchCommand(Bukkit.getConsoleSender(), processed);
                         }
+                        dataStore.addCommand(id, name, 1);
                     });
                 }
                 // 更新下次触发时间
@@ -200,6 +205,27 @@ public class RewardManager {
         }
         if (best == Integer.MAX_VALUE) return 0;
         return best;
+    }
+
+    public int getMoneyRemainingSeconds(String pondName) {
+        Long m = moneyNextEpochSec.get(pondName);
+        if (m == null) return 0;
+        long now = System.currentTimeMillis() / 1000L;
+        return (int) Math.max(0L, m - now);
+    }
+
+    public int getPointsRemainingSeconds(String pondName) {
+        Long p = pointsNextEpochSec.get(pondName);
+        if (p == null) return 0;
+        long now = System.currentTimeMillis() / 1000L;
+        return (int) Math.max(0L, p - now);
+    }
+
+    public int getCommandRemainingSeconds(String pondName) {
+        Long c = commandNextEpochSec.get(pondName);
+        if (c == null) return 0;
+        long now = System.currentTimeMillis() / 1000L;
+        return (int) Math.max(0L, c - now);
     }
 
     private List<Player> listPlayersInPond(Pond pond) {

@@ -58,12 +58,20 @@ public class DataStore {
         return data.getInt(pondPath(uuid, pond) + ".points_day", 0);
     }
 
+    public int getDailyCommand(UUID uuid, String pond) {
+        return data.getInt(pondPath(uuid, pond) + ".command_day", 0);
+    }
+
     public void resetDailyMoney(UUID uuid, String pond) {
         data.set(pondPath(uuid, pond) + ".money_day", 0);
     }
 
     public void resetDailyPoints(UUID uuid, String pond) {
         data.set(pondPath(uuid, pond) + ".points_day", 0);
+    }
+
+    public void resetDailyCommand(UUID uuid, String pond) {
+        data.set(pondPath(uuid, pond) + ".command_day", 0);
     }
 
     public void addMoney(UUID uuid, String pond, int amount) {
@@ -78,6 +86,13 @@ public class DataStore {
         data.set(pondPath(uuid, pond) + ".points_day", day);
         int total = data.getInt(playerPath(uuid) + ".points_total", 0) + amount;
         data.set(playerPath(uuid) + ".points_total", total);
+    }
+
+    public void addCommand(UUID uuid, String pond, int amount) {
+        int day = getDailyCommand(uuid, pond) + amount;
+        data.set(pondPath(uuid, pond) + ".command_day", day);
+        int total = data.getInt(playerPath(uuid) + ".command_total", 0) + amount;
+        data.set(playerPath(uuid) + ".command_total", total);
     }
 
     public int getMoneyTotal(UUID uuid) {
@@ -97,6 +112,7 @@ public class DataStore {
             for (String pond : data.getConfigurationSection(base).getKeys(false)) {
                 data.set(base + "." + pond + ".money_day", 0);
                 data.set(base + "." + pond + ".points_day", 0);
+                data.set(base + "." + pond + ".command_day", 0);
             }
         }
         data.set("meta.last_reset_epoch", System.currentTimeMillis());

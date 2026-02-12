@@ -5,8 +5,14 @@
 # 变量占位：
 #  - {player}: 玩家名
 #  - {pond}: 池名称
+#  - {online}: 当前池内在线人数
 #  - {money_today}/{money_max}: 今日/每日上限的金币
 #  - {points_today}/{points_max}: 今日/每日上限的点券
+#  - {command_today}/{command_max}: 今日/每日上限的命令奖励次数
+#  - {next_reward_countdown}: 距离最近的一个奖励的剩余秒数
+#  - {money_countdown}: 距离下次金币奖励的剩余秒数
+#  - {points_countdown}: 距离下次点券奖励的剩余秒数
+#  - {command_countdown}: 距离下次命令奖励的剩余秒数
 #  - 其他 UI 项按实现映射
 #
 # 使用说明：
@@ -34,6 +40,8 @@ general:
     check_interval: 30                # 检查间隔（秒）
     convert_ice_to_water: true        # 是否将冰块转换为水
     debug_log: false                  # 是否记录防结冰调试日志
+  # 粒子效果总开关
+  enable_effects: true              # 是否启用粒子效果（关闭后不运行任何粒子线程）
   # 更新检测配置
   update_checker:
     enable: true                      # 是否启用更新检测
@@ -95,6 +103,7 @@ ponds:
       command:
         enable: false
         speed: 30
+        max: 0                          # 每日触发次数上限，0 为不限制
         commands:
           - "say Congrats {player}"
       async: true                         # 强制异步发放（必要）
@@ -116,9 +125,30 @@ ponds:
         template: "&b{pond}&7: 金币 {money_today}/{money_max} | 点券 {points_today}/{points_max}"
       bossbar:
         enable: true
+        # 旧版兼容配置 (如果 bars 为空则生效)
         color: BLUE
         style: SEGMENTED_10
         items: [MONEY_PROGRESS, POINTS_PROGRESS, ONLINE_IN_POND, NEXT_REWARD_COUNTDOWN]
+        # 新版多 BossBar 配置 (优先级高于旧版)
+        bars:
+          money:
+            enable: true
+            title: "&e金币: {money_today}/{money_max}"
+            color: YELLOW
+            style: SOLID
+            progress: MONEY
+          points:
+            enable: true
+            title: "&d点券: {points_today}/{points_max}"
+            color: PURPLE
+            style: SEGMENTED_10
+            progress: POINTS
+          command:
+            enable: true
+            title: "&a下一次奖励: {next_reward_countdown}"
+            color: GREEN
+            style: SOLID
+            progress: COMMAND
       message:
         money: "&a获得金币 {amount} (今日 {money_today}/{money_max})"
         points: "&a获得点券 {amount} (今日 {points_today}/{points_max})"
